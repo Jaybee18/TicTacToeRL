@@ -1,28 +1,35 @@
-import keras
-import numpy as np
 from enum import Enum
 from random import randint
+
+import keras
+import numpy as np
 
 game_state: list[int] = [0, 0, 0, 0, 0, 0, 0, 0, 0]
 
 X = 1
 O = -1
 
+
 def print_game_state(state: list):
-    print("""
+    print(
+        """
 [{}, {}, {}]
 [{}, {}, {}]
 [{}, {}, {}]
 """.format(*["X" if s == X else "O" if s == O else " " for s in state])
     )
 
+
 def create_q_model():
-    return keras.Sequential([
-        keras.layers.Dense(32, activation='relu', input_shape=(9,)),
-        keras.layers.Dense(64, activation='relu'),
-        keras.layers.Dense(9, activation='linear'),
-        keras.layers.Softmax()
-    ])
+    return keras.Sequential(
+        [
+            keras.layers.Dense(32, activation="relu", input_shape=(9,)),
+            keras.layers.Dense(64, activation="relu"),
+            keras.layers.Dense(9, activation="linear"),
+            keras.layers.Softmax(),
+        ]
+    )
+
 
 def has_won(state: list, player: int) -> bool | None:
     """Checks if player has won or lost returning True or False. Returns None if game is ongoing"""
@@ -46,6 +53,7 @@ def has_won(state: list, player: int) -> bool | None:
         return True
     return None
 
+
 def game_loop():
     global game_state
 
@@ -56,15 +64,21 @@ def game_loop():
         print_game_state(game_state)
 
         if has_won(game_state, turn):
-            print("Player", turn, "wins!")
+            print("Player", "X" if turn == X else "O", "wins!")
             break
 
         turn = -turn
 
     print("Game Over!")
 
+
 def invalid_move(pre: list[int], after: list[int]) -> bool:
-    return len(list(filter(lambda x: x == 0, after))) - len(list(filter(lambda x: x == 0, pre))) == 1
+    return (
+        len(list(filter(lambda x: x == 0, after)))
+        - len(list(filter(lambda x: x == 0, pre)))
+        == 1
+    )
+
 
 def main():
     print("Hello from tictactoerl!")
@@ -75,6 +89,7 @@ def main():
     # print(model.predict(np.array([game_state])))
     #
     game_loop()
+
 
 if __name__ == "__main__":
     main()
