@@ -1,3 +1,4 @@
+import os
 import keras
 from random import random, sample
 from collections import deque
@@ -16,25 +17,34 @@ def _create_q_model():
     )
 
 class DQNAgent(TicTacToeAgent):
-    def __init__(self, player: int):
+    def __init__(self, player: int, learning_rate: float = 0.001, gamma: float = 0.95, 
+                 epsilon: float = 1.0, epsilon_min: float = 0.01, epsilon_decay: float = 0.995,
+                 batch_size: int = 32, memory_size: int = 10000):
         super().__init__(player)
         self.opponent = -player
+        
+        # Store hyperparameters
+        self.learning_rate = learning_rate
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.epsilon_min = epsilon_min
+        self.epsilon_decay = epsilon_decay
+        self.batch_size = batch_size
+        self.memory_size = memory_size
+        self.episodes_trained = 0
+        
         self.model = _create_q_model()
         self.target_model = _create_q_model()
         self.target_model.set_weights(self.model.get_weights())
         
-        self.optimizer = keras.optimizers.Adam(learning_rate=0.001)
+        self.optimizer = keras.optimizers.Adam(learning_rate=self.learning_rate)
         self.loss_fn = keras.losses.MeanSquaredError()
 
         self.model.compile(optimizer=self.optimizer, loss=self.loss_fn)
         self.target_model.compile(optimizer=self.optimizer, loss=self.loss_fn)
         
-        self.memory = deque(maxlen=10000)
-        self.gamma = 0.95  # Discount factor
-        self.epsilon = 1.0  # Exploration rate
-        self.epsilon_min = 0.01
-        self.epsilon_decay = 0.995
-        self.batch_size = 32
+        self.memory = deque(maxlen=self.memory_size)
+        self.batch_size = batch_size
     
     def get_action(self, state: list[int], valid_moves: list[int], training=True) -> int:
         """Select action using epsilon-greedy policy"""
@@ -73,12 +83,15 @@ class DQNAgent(TicTacToeAgent):
         # Get next Q values from target model
         next_q = self.target_model.predict(next_states, verbose=0)
         
-        # Update Q values
+        # Update Q values with smooth blending to prevent catastrophic forgetting
         for i in range(self.batch_size):
             if dones[i]:
-                current_q[i][actions[i]] = rewards[i]
+                target = rewards[i]
             else:
-                current_q[i][actions[i]] = rewards[i] + self.gamma * np.max(next_q[i])
+                target = rewards[i] + self.gamma * np.max(next_q[i])
+            
+            # Blend old and new Q-values (0.1 old + 0.9 new)
+            current_q[i][actions[i]] = current_q[i][actions[i]] * 0.1 + target * 0.9
         
         # Train model
         self.model.fit(states, current_q, epochs=1, verbose=0)
@@ -91,14 +104,29 @@ class DQNAgent(TicTacToeAgent):
         """Copy weights from model to target model"""
         self.target_model.set_weights(self.model.get_weights())
     
-    def save(self, filepath: str = "c:\\GitHub\\TicTacToeRL\\models\\tictactoe_dqn.keras"):
+    def _generate_filename(self) -> str:
+        """Generate filename based on hyperparameters."""
+        # Format floating point numbers to use comma as decimal separator for filename
+        lr_str = str(self.learning_rate).replace('.', ',')
+        gamma_str = str(self.gamma).replace('.', ',')
+        eps_min_str = str(self.epsilon_min).replace('.', ',')
+        eps_decay_str = str(self.epsilon_decay).replace('.', ',')
+        
+        filename = f"model_episodes_{self.episodes_trained}_lr_{lr_str}_gamma_{gamma_str}_eps_min_{eps_min_str}_eps_decay_{eps_decay_str}_batch_{self.batch_size}_mem_{self.memory_size}.keras"
+        return filename
+    
+    def save(self, filepath: str = None):
         """Save the model weights to a file."""
-        import os
+        if filepath is None:
+            filename = self._generate_filename()
+            filepath = os.path.join("c:\\GitHub\\TicTacToeRL\\models", filename)
+        
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         self.model.save(filepath)
         print(f"Model saved to {filepath}")
+        return filepath
     
-    def load(self, filepath: str = "c:\\GitHub\\TicTacToeRL\\models\\tictactoe_dqn.keras"):
+    def load(self, filepath: str):
         """Load the model weights from a file."""
         self.model = keras.models.load_model(filepath)
         self.target_model.set_weights(self.model.get_weights())

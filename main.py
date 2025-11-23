@@ -1,3 +1,5 @@
+import os
+import glob
 from enum import Enum
 from random import randint, random, sample
 import matplotlib.pyplot as plt
@@ -80,7 +82,7 @@ def make_move(state: list[int], position: int, player: int) -> list[int]:
     new_state[position] = player
     return new_state
 
-def play_game(agent: TicTacToeAgent, opponent_random=True, training=True):
+def play_game(agent: TicTacToeAgent, opponent: TicTacToeAgent, training=True):
     """Play one game and return reward"""
     state = [0] * 9
     current_player = X
@@ -133,10 +135,7 @@ def play_game(agent: TicTacToeAgent, opponent_random=True, training=True):
                 return reward
         else:
             # Opponent's turn
-            if opponent_random:
-                action = np.random.choice(valid_moves)
-            else:
-                action = np.random.choice(valid_moves)
+            action = opponent.get_action(state, valid_moves)
             
             prev_state = state.copy()
             state = make_move(state, action, current_player)
@@ -176,9 +175,10 @@ def play_game(agent: TicTacToeAgent, opponent_random=True, training=True):
         current_player = -current_player
 
 
-def train_agent(episodes=10000, update_target_every=100):
+def train_agent(opponent: TicTacToeAgent, episodes=10000, update_target_every=100):
     """Train the DQN agent"""
     agent = DQNAgent(player=X)
+    agent.episodes_trained = episodes  # Store total episodes for filename
     rewards_history = []
     avg_rewards = []
     wins = 0
@@ -188,7 +188,7 @@ def train_agent(episodes=10000, update_target_every=100):
     print("Training started...")
     
     for episode in range(episodes):
-        reward = play_game(agent, opponent_random=True, training=True)
+        reward = play_game(agent, opponent, training=True)
         rewards_history.append(reward)
         
         # Track outcomes
@@ -316,9 +316,10 @@ def main():
     
     choice = input("Choose option (1, 2, or 3): ")
     
+    opponent = PerfectAgent(player=O)
     if choice == "1":
         episodes = int(input("Enter number of training episodes (default 10000): ") or "10000")
-        agent = train_agent(episodes=episodes)
+        agent = train_agent(opponent=opponent, episodes=episodes)
         
         play_more = input("\nDo you want to play against the trained agent? (y/n): ")
         if play_more.lower() == 'y':
@@ -329,7 +330,7 @@ def main():
                     break
     elif choice == "2":
         print("\nQuick training for demonstration (2500 episodes)...")
-        agent = train_agent(episodes=2500)
+        agent = train_agent(opponent=opponent, episodes=2500)
         
         while True:
             play_against_human(agent)
@@ -337,13 +338,20 @@ def main():
             if again.lower() != 'y':
                 break
     elif choice == "3":
-        import os
-        model_path = "c:\\GitHub\\TicTacToeRL\\models\\tictactoe_dqn.keras"
+        models_dir = "c:\\GitHub\\TicTacToeRL\\models"
+        model_files = glob.glob(os.path.join(models_dir, "model_*.keras"))
         
-        if not os.path.exists(model_path):
-            print(f"No trained model found at {model_path}")
+        if not model_files:
+            print(f"No trained models found in {models_dir}")
             print("Please train a model first (option 1 or 2)")
             return
+        
+        print("\nAvailable models:")
+        for i, model_file in enumerate(model_files, 1):
+            print(f"{i}. {os.path.basename(model_file)}")
+        
+        model_choice = int(input(f"\nSelect model (1-{len(model_files)}): ")) - 1
+        model_path = model_files[model_choice]
         
         agent = DQNAgent(player=X)
         agent.load(model_path)
