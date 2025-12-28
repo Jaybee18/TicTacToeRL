@@ -18,8 +18,8 @@ def _create_q_model():
 
 class DQNAgent(TicTacToeAgent):
     def __init__(self, player: int, learning_rate: float = 0.001, gamma: float = 0.95, 
-                 epsilon: float = 1.0, epsilon_min: float = 0.01, epsilon_decay: float = 0.995,
-                 batch_size: int = 32, memory_size: int = 10000):
+                 epsilon: float = 1.0, epsilon_min: float = 0.01, epsilon_decay: float = 0.997,
+                 batch_size: int = 32, memory_size: int = 20000):
         super().__init__(player)
         self.opponent = -player
         
@@ -51,18 +51,24 @@ class DQNAgent(TicTacToeAgent):
         if training and random() < self.epsilon:
             return np.random.choice(valid_moves)
         
-        q_values = self.model.predict(np.array([state]), verbose=0)[0]
-        
-        # Mask invalid moves
+        # Transform state to agent's perspective (agent=1, opponent=-1)
+        agent_state = [cell * self.player for cell in state]
+        q_values = self.model.predict(np.array([agent_state]), verbose=0)[0]
+
+        # Mask invalid moves - crucial for efficient learning!
+        # The agent would otherwise waste a lot of episodes
+        # just learning which fields it is allowed to mark
         masked_q = np.full(9, -np.inf)
         for move in valid_moves:
             masked_q[move] = q_values[move]
-        
         return np.argmax(masked_q)
     
     def remember(self, state, action, reward, next_state, done):
-        """Store experience in replay memory"""
-        self.memory.append((state, action, reward, next_state, done))
+        """Store experience in replay memory with agent perspective"""
+        # Transform states to agent's perspective
+        agent_state = [cell * self.player for cell in state]
+        agent_next_state = [cell * self.player for cell in next_state]
+        self.memory.append((agent_state, action, reward, agent_next_state, done))
     
     def replay(self):
         """Train on batch from memory"""
@@ -83,15 +89,15 @@ class DQNAgent(TicTacToeAgent):
         # Get next Q values from target model
         next_q = self.target_model.predict(next_states, verbose=0)
         
-        # Update Q values with smooth blending to prevent catastrophic forgetting
+        # Update Q-value for the specific action taken
         for i in range(self.batch_size):
             if dones[i]:
-                target = rewards[i]
+                current_q[i][actions[i]] = rewards[i]
             else:
-                target = rewards[i] + self.gamma * np.max(next_q[i])
+                current_q[i][actions[i]] = rewards[i] + self.gamma * np.max(next_q[i])
             
-            # Blend old and new Q-values (0.1 old + 0.9 new)
-            current_q[i][actions[i]] = current_q[i][actions[i]] * 0.1 + target * 0.9
+            # # Blend old and new Q-values (0.1 old + 0.9 new)
+            # current_q[i][actions[i]] = current_q[i][actions[i]] * 0.1 + target * 0.9
         
         # Train model
         self.model.fit(states, current_q, epochs=1, verbose=0)
@@ -112,7 +118,7 @@ class DQNAgent(TicTacToeAgent):
         eps_min_str = str(self.epsilon_min).replace('.', ',')
         eps_decay_str = str(self.epsilon_decay).replace('.', ',')
         
-        filename = f"model_episodes_{self.episodes_trained}_lr_{lr_str}_gamma_{gamma_str}_eps_min_{eps_min_str}_eps_decay_{eps_decay_str}_batch_{self.batch_size}_mem_{self.memory_size}.keras"
+        filename = f"v2_model_episodes_{self.episodes_trained}_lr_{lr_str}_gamma_{gamma_str}_eps_min_{eps_min_str}_eps_decay_{eps_decay_str}_batch_{self.batch_size}_mem_{self.memory_size}.keras"
         return filename
     
     def save(self, filepath: str = None):

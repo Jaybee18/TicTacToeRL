@@ -21,7 +21,7 @@ class PerfectAgent(TicTacToeAgent):
             player: 1 for X, -1 for O
         """
         super().__init__(player)
-        self.level = 1.0
+        self.level = 0.8
 
     def _state_to_matrix(self, state: list[int]) -> list[list[int]]:
         """Convert flat state list to 3x3 matrix."""
@@ -125,7 +125,7 @@ class PerfectAgent(TicTacToeAgent):
                 return self._matrix_to_index(i, j)
         return None
 
-    def get_action(self, state: list[int], valid_moves: list[int]) -> int:
+    def get_action(self, state: list[int], valid_moves: list[int], training=True) -> int:
         """
         Select the best move using optimal strategy.
         

@@ -79,103 +79,79 @@ def get_valid_moves(state: list[int]) -> list[int]:
 def make_move(state: list[int], position: int, player: int) -> list[int]:
     """Returns new state with move applied"""
     new_state = state.copy()
+
+    # No changes to the state on illegal moves
+    if new_state[position] != 0:
+        return new_state
+
     new_state[position] = player
     return new_state
+
+def get_reward(old_state: list[int], new_state: list[int], result) -> float:
+    # Illegal moves are seen as a loss
+    if old_state.count(0) == new_state.count(0):
+        return -1
+    
+    # Winning and losing is 5 and -5 respectively
+    if result is True:
+        return 1
+    if result is False:
+        return -1
+    
+    # Draws are the best outcome when playing against the perfect player
+    if result == "draw":
+        return 0
+    
+    # No reward for continuing
+    return 0
 
 def play_game(agent: TicTacToeAgent, opponent: TicTacToeAgent, training=True):
     """Play one game and return reward"""
     state = [0] * 9
     current_player = X
-    episode_experiences = []  # Store all experiences for this episode
+    episode_experiences_x = []  # Store all experiences for this episode
+    episode_experiences_o = []  # Store all experiences for this episode
+    won = None
     
     while True:
-        valid_moves = get_valid_moves(state)
+        cp = agent if agent.player == current_player else opponent
         
-        if current_player == agent.player:
-            action = agent.get_action(state, valid_moves, training)
-            new_state = make_move(state, action, current_player)
-            
-            result = has_won(new_state, agent.player)
-            
-            # Assign rewards based on game outcome
-            if result is True:
-                reward = 1.0
-                done = True
-            elif result is False:
-                reward = -1.0
-                done = True
-            elif result == "draw":
-                reward = 0.5
-                done = True
-            else:
-                # Small negative reward for continuing (encourages faster wins)
-                reward = -0.01
-                done = False
-            
-            if training:
-                # Store this experience
-                episode_experiences.append((state.copy(), action, reward, new_state.copy(), done))
-            
-            state = new_state
-            
-            if done:
-                # Backpropagate rewards through all agent's moves
-                if training:
-                    for i, (s, a, r, ns, d) in enumerate(episode_experiences):
-                        # Give final reward to all moves (temporal credit assignment)
-                        if i == len(episode_experiences) - 1:
-                            agent.remember(s, a, reward, ns, d)
-                        else:
-                            # Intermediate moves get discounted reward
-                            agent.remember(s, a, -0.01, ns, False)
-                    
-                    # Train after EACH game
-                    agent.replay()
-                
-                return reward
+        valid_moves = get_valid_moves(state) # Not really needed
+        action = cp.get_action(state, valid_moves, training)
+
+        # Make env step
+        new_state = make_move(state, action, cp.player)
+        result = has_won(new_state, cp.player)
+        reward = get_reward(state, new_state, result)
+        done = result is True or result is False or result == "draw" or state.count(0) == new_state.count(0)
+
+        # Store step as memory
+        if cp.player == X:
+            episode_experiences_x.append([state.copy(), action, reward, new_state.copy(), done])
         else:
-            # Opponent's turn
-            action = opponent.get_action(state, valid_moves)
-            
-            prev_state = state.copy()
-            state = make_move(state, action, current_player)
-            
-            result = has_won(state, agent.player)
-            
-            # Store experiences when opponent's move ends the game
-            if training and result is not None and len(episode_experiences) > 0:
-                # Opponent won or caused draw - update last agent move with this info
-                if result is False:
-                    # Agent lost due to opponent's move
-                    last_state, last_action, _, last_next, _ = episode_experiences[-1]
-                    episode_experiences[-1] = (last_state, last_action, -1.0, state.copy(), True)
-                elif result == "draw":
-                    last_state, last_action, _, last_next, _ = episode_experiences[-1]
-                    episode_experiences[-1] = (last_state, last_action, 0.5, state.copy(), True)
-            
-            if result is not None:
-                if training:
-                    # Store all experiences with final outcome
-                    final_reward = 1.0 if result is True else (-1.0 if result is False else 0.5)
-                    for i, (s, a, r, ns, d) in enumerate(episode_experiences):
-                        if i == len(episode_experiences) - 1:
-                            agent.remember(s, a, final_reward, state.copy(), True)
-                        else:
-                            agent.remember(s, a, -0.01, ns, False)
-                    
-                    agent.replay()
-                
-                if result is True:
-                    return 1.0
-                elif result is False:
-                    return -1.0
-                else:
-                    return 0.5
+            episode_experiences_o.append([state.copy(), action, reward, new_state.copy(), done])
         
+        # Retroactively give a negative reward for the losing agent 
+        # if the current move ended the game
+        if done and reward == 1:
+            # The winning player is cp, so update the OTHER player's last move
+            if cp.player == X and len(episode_experiences_o) > 0:
+                episode_experiences_o[-1][2] = -1
+            elif cp.player == O and len(episode_experiences_x) > 0:
+                episode_experiences_x[-1][2] = -1
+        
+        # Commit new state and change player
+        state = new_state
         current_player = -current_player
 
+        if done:
+            won = None if result == "draw" else cp.player if result else -cp.player
+            break
 
-def train_agent(opponent: TicTacToeAgent, episodes=10000, update_target_every=100):
+    return episode_experiences_x, episode_experiences_o, won
+
+
+def train_agent(opponent: TicTacToeAgent, episodes=10000, update_target_every=250):
     """Train the DQN agent"""
     agent = DQNAgent(player=X)
     agent.episodes_trained = episodes  # Store total episodes for filename
@@ -186,21 +162,29 @@ def train_agent(opponent: TicTacToeAgent, episodes=10000, update_target_every=10
     draws = 0
     
     print("Training started...")
-    
+
     for episode in range(episodes):
-        reward = play_game(agent, opponent, training=True)
-        rewards_history.append(reward)
+        exp_x, exp_o, winner = play_game(agent, opponent, training=True)
         
         # Track outcomes
-        if reward > 0.9:
+        if winner == agent.player:
             wins += 1
-        elif reward < -0.9:
-            losses += 1
-        else:
+            rewards_history.append(1)
+        elif winner == None:
             draws += 1
-        
-        # Update target network periodically
-        if episode % update_target_every == 0:
+            rewards_history.append(0)
+        else:
+            losses += 1
+            rewards_history.append(-1)
+
+        # Store experiences in replay memory for training agent
+        for exp in exp_x:
+            agent.remember(*exp)
+
+        # Train the agents network for one step
+        agent.replay()
+
+        if episode % update_target_every == 0 and episode > 0:
             agent.update_target_model()
         
         # Print progress
@@ -298,14 +282,6 @@ def play_against_human(agent: TicTacToeAgent):
             break
         
         current_player = -current_player
-
-def invalid_move(pre: list[int], after: list[int]) -> bool:
-    """Check if move is invalid"""
-    return (
-        len(list(filter(lambda x: x == 0, pre)))
-        - len(list(filter(lambda x: x == 0, after)))
-        != 1
-    )
 
 
 def main():
