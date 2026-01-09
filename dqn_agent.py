@@ -17,11 +17,10 @@ def _create_q_model():
     )
 
 class DQNAgent(TicTacToeAgent):
-    def __init__(self, player: int, learning_rate: float = 0.001, gamma: float = 0.95, 
+    def __init__(self, player: int = 1, learning_rate: float = 0.001, gamma: float = 0.95, 
                  epsilon: float = 1.0, epsilon_min: float = 0.01, epsilon_decay: float = 0.997,
                  batch_size: int = 32, memory_size: int = 20000):
         super().__init__(player)
-        self.opponent = -player
         
         # Store hyperparameters
         self.learning_rate = learning_rate

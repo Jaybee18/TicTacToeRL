@@ -13,7 +13,7 @@ class PerfectAgent(TicTacToeAgent):
     to make the best move available at each time.
     """
 
-    def __init__(self, player: int):
+    def __init__(self, player: int = 1):
         """
         Initialize the perfect agent.
         
