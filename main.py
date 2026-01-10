@@ -30,7 +30,7 @@ def main():
                     break
     elif choice == "2":
         models_dir = "c:\\GitHub\\TicTacToeRL\\models"
-        model_files = glob.glob(os.path.join(models_dir, "model_*.keras"))
+        model_files = glob.glob(os.path.join(models_dir, "*.keras"))
         
         if not model_files:
             print(f"No trained models found in {models_dir}")
@@ -44,7 +44,7 @@ def main():
         model_choice = int(input(f"\nSelect model (1-{len(model_files)}): ")) - 1
         model_path = model_files[model_choice]
         
-        agent = DQNAgent(player=X)
+        agent = DQNAgent()
         agent.load(model_path)
         agent.epsilon = 0.0  # No exploration when playing
         
