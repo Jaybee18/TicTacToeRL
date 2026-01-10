@@ -139,6 +139,9 @@ def train_agent(agent: TicTacToeAgent, opponent: TicTacToeAgent, episodes=10000,
         if winner == agent.player:
             wins += 1
             rewards_history.append(1)
+            print(f"Agent is {agent.player}")
+            tmp = '\n\t'.join(map(str, exp))
+            print(f"===\n\t" + tmp + "\n===\n")
         elif winner == None:
             draws += 1
             rewards_history.append(0)

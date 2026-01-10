@@ -16,6 +16,7 @@ def main():
     choice = input("Choose option (1 or 2): ")
     
     opponent = PerfectAgent()
+    opponent.level = 1
     if choice == "1":
         episodes = int(input("Enter number of training episodes (default 2500): ") or "2500")
         agent = train_agent(agent=DQNAgent(), opponent=opponent, episodes=episodes)
