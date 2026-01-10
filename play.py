@@ -1,18 +1,20 @@
 from agent import TicTacToeAgent
-from constants import X
+from constants import X, O
 from train import get_valid_moves, has_won, make_move
 from utils import print_game_state, print_game_state_with_numbers
+
+from random import choice
 
 
 def play_against_human(agent: TicTacToeAgent):
     """Play against the trained agent"""
     print("\n=== Play Against AI ===")
-    print("You are O, AI is X")
     print("Use numbers 1-9 to select positions:")
     print_game_state_with_numbers([0] * 9)
     
     state = [0] * 9
-    current_player = X
+    agent.player = choice([X, O])
+    current_player = choice([X, O])
     
     while True:
         print_game_state(state)
@@ -24,7 +26,7 @@ def play_against_human(agent: TicTacToeAgent):
             state = make_move(state, action, current_player)[0]
             print(f"AI chose position {action + 1}")
         else:
-            print("Your turn (O):")
+            print(f"Your turn ({'O' if agent.player == X else 'X'}):")
             print_game_state_with_numbers(state)
             valid_moves = get_valid_moves(state)
             
@@ -43,11 +45,11 @@ def play_against_human(agent: TicTacToeAgent):
         result = has_won(state, agent.player)
         if result is True:
             print_game_state(state)
-            print("AI (X) wins!")
+            print(f"AI ({'O' if agent.player == O else 'X'}) wins!")
             break
         elif result is False:
             print_game_state(state)
-            print("You (O) win!")
+            print(f"You ({'O' if agent.player == X else 'X'}) win!")
             break
         elif result == "draw":
             print_game_state(state)
