@@ -21,7 +21,7 @@ def play_against_human(agent: TicTacToeAgent):
             print("AI's turn...")
             valid_moves = get_valid_moves(state)
             action = agent.get_action(state, valid_moves, training=False)
-            state = make_move(state, action, current_player)
+            state = make_move(state, action, current_player)[0]
             print(f"AI chose position {action + 1}")
         else:
             print("Your turn (O):")
@@ -38,7 +38,7 @@ def play_against_human(agent: TicTacToeAgent):
                 except ValueError:
                     print("Please enter a number between 1 and 9.")
             
-            state = make_move(state, move, current_player)
+            state = make_move(state, move, current_player)[0]
         
         result = has_won(state, agent.player)
         if result is True:
