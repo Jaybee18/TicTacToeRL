@@ -1,94 +1,61 @@
-from enum import Enum
-from random import randint
+import os
+import glob
 
-import keras
-import numpy as np
-
-game_state: list[int] = [0, 0, 0, 0, 0, 0, 0, 0, 0]
-
-X = 1
-O = -1
-
-
-def print_game_state(state: list):
-    print(
-        """
-[{}, {}, {}]
-[{}, {}, {}]
-[{}, {}, {}]
-""".format(*["X" if s == X else "O" if s == O else " " for s in state])
-    )
-
-
-def create_q_model():
-    return keras.Sequential(
-        [
-            keras.layers.Dense(32, activation="relu", input_shape=(9,)),
-            keras.layers.Dense(64, activation="relu"),
-            keras.layers.Dense(9, activation="linear"),
-            keras.layers.Softmax(),
-        ]
-    )
-
-
-def has_won(state: list, player: int) -> bool | None:
-    """Checks if player has won or lost returning True or False. Returns None if game is ongoing"""
-    if state[0] == state[1] == state[2] != 0:
-        return state[0] == player
-    elif state[3] == state[4] == state[5] != 0:
-        return state[3] == player
-    elif state[6] == state[7] == state[8] != 0:
-        return state[6] == player
-    elif state[0] == state[3] == state[6] != 0:
-        return state[0] == player
-    elif state[1] == state[4] == state[7] != 0:
-        return state[1] == player
-    elif state[2] == state[5] == state[8] != 0:
-        return state[2] == player
-    elif state[0] == state[4] == state[8] != 0:
-        return state[0] == player
-    elif state[2] == state[4] == state[6] != 0:
-        return state[2] == player
-    elif 0 not in state:
-        return True
-    return None
-
-
-def game_loop():
-    global game_state
-
-    turn = -1
-
-    while True:
-        game_state[randint(0, 8)] = turn
-        print_game_state(game_state)
-
-        if has_won(game_state, turn):
-            print("Player", "X" if turn == X else "O", "wins!")
-            break
-
-        turn = -turn
-
-    print("Game Over!")
-
-
-def invalid_move(pre: list[int], after: list[int]) -> bool:
-    return (
-        len(list(filter(lambda x: x == 0, after)))
-        - len(list(filter(lambda x: x == 0, pre)))
-        == 1
-    )
+from constants import X
+from perfect_agent import PerfectAgent
+from dqn_agent import DQNAgent
+from play import play_against_human
+from train import train_agent
 
 
 def main():
-    print("Hello from tictactoerl!")
-
-    # print_game_state(game_state)
-
-    # model = create_q_model()
-    # print(model.predict(np.array([game_state])))
-    #
-    game_loop()
+    print("=== TicTacToe Deep Q-Learning ===")
+    print("1. Train new agent")
+    print("2. Load trained agent and play")
+    
+    choice = input("Choose option (1 or 2): ")
+    
+    opponent = PerfectAgent()
+    opponent.level = 1
+    if choice == "1":
+        episodes = int(input("Enter number of training episodes (default 2500): ") or "2500")
+        agent = train_agent(agent=DQNAgent(), opponent=opponent, episodes=episodes)
+        
+        play_more = input("\nDo you want to play against the trained agent? (y/n): ")
+        if play_more.lower() == 'y':
+            while True:
+                play_against_human(agent)
+                again = input("\nPlay again? (y/n): ")
+                if again.lower() != 'y':
+                    break
+    elif choice == "2":
+        models_dir = "c:\\GitHub\\TicTacToeRL\\models"
+        model_files = glob.glob(os.path.join(models_dir, "model_*.keras"))
+        
+        if not model_files:
+            print(f"No trained models found in {models_dir}")
+            print("Please train a model first (option 1 or 2)")
+            return
+        
+        print("\nAvailable models:")
+        for i, model_file in enumerate(model_files, 1):
+            print(f"{i}. {os.path.basename(model_file)}")
+        
+        model_choice = int(input(f"\nSelect model (1-{len(model_files)}): ")) - 1
+        model_path = model_files[model_choice]
+        
+        agent = DQNAgent(player=X)
+        agent.load(model_path)
+        agent.epsilon = 0.0  # No exploration when playing
+        
+        print("\nLoaded trained agent. Ready to play!")
+        while True:
+            play_against_human(agent)
+            again = input("\nPlay again? (y/n): ")
+            if again.lower() != 'y':
+                break
+    else:
+        print("Invalid choice. Please run again and select 1, 2, or 3.")
 
 
 if __name__ == "__main__":
