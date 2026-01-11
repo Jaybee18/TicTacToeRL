@@ -1,1 +1,0 @@
-packageSearchIndex = [{"l":"Alle Packages","u":"allpackages-index.html"},{"l":"tictactoe"},{"l":"tictactoe.spieler"},{"l":"tictactoe.spieler.beispiel"}];updateSearchResults();
